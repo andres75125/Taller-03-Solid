@@ -1,59 +1,61 @@
 package clinicaveterinaria;
 
+import clinicaveterinaria.interfaces.*;
 import clinicaveterinaria.model.*;
 import clinicaveterinaria.repository.*;
 import clinicaveterinaria.service.*;
-
 
 import java.time.LocalDate;
 
 public class Main {
     public static void main(String[] args) {
-        BaseDatos baseDatos = new BaseDatos();
-        MascotaService mascotaService = new MascotaService(baseDatos);
-        VeterinarioCrudService veterinarioCrudService = new VeterinarioCrudService(baseDatos);
-        ReservaService reservaService = new ReservaService(baseDatos);
-        DiagnosticoService diagnosticoService = new DiagnosticoService();
-        FacturacionService facturacionService = new FacturacionService(baseDatos);
-        TratamientoService tratamientoService = new TratamientoService(baseDatos);
-        ReporteService reporteService = new ReporteService(baseDatos);
-
-        Mascota mascota = new Mascota(1, "Luna", TipoAnimal.PERRO, 4, "Ana Perez");
-        Veterinario veterinario = new Veterinario(1, "Dr. Ruiz", "Medicina general", true);
-        Tratamiento tratamiento = new Tratamiento(1, TipoTratamiento.CIRUGIA, "Esterilizacion", 120.0);
-
-        mascotaService.crearMascota(mascota);
-        veterinarioCrudService.crearVeterinario(veterinario);
-        tratamientoService.crearTratamiento(tratamiento);
-
-        Cita cita = reservaService.reservarCita(1, mascota, veterinario, LocalDate.now());
-        diagnosticoService.diagnosticar(cita, "Paciente estable para tratamiento.");
-        Factura factura = facturacionService.generarFactura(1, cita, tratamiento.calcularCostoFinal());
-        factura.setPagada(true);
-
         System.out.println("=== ClinicaVeterinaria funcionando ===");
-        System.out.println(mascotaService.obtenerMascota(1));
-        System.out.println(cita);
-        System.out.println(factura);
-        System.out.println("Preparacion: " + tratamientoService.prepararSala(tratamiento));
-        System.out.println("Costo con impuestos: " + new CalculadoraCostoTratamiento().calcularConImpuestos(tratamiento));
-        System.out.println("Citas Dr. Ruiz: " + reporteService.generarReporteCitasPorVeterinario(1).size());
-        System.out.println("Mascotas de Ana Perez: " + reporteService.generarReporteMascotasPorDueno("Ana Perez").size());
-        System.out.println("Ingresos del mes: " + reporteService.calcularIngresosMensual());
 
-        demostrarViolacionesSinRomperEjecucion(veterinario, mascota, tratamiento, reservaService, diagnosticoService, reporteService);
-        new Clinica().agendarConsultaRapida(mascota, veterinario);
-        new ServicioClinicaCompleto(baseDatos).calcularTratamiento(tratamiento);
-    }
+        // Instanciación desacoplada (DIP)
+        IBaseDatos baseDatos = new BaseDatos();
+        baseDatos.conectar();
 
-    private static void demostrarViolacionesSinRomperEjecucion(Veterinario veterinario, Mascota mascota, Tratamiento tratamiento, ReservaService reservaService, DiagnosticoService diagnosticoService, ReporteService reporteService) {
-        Cita citaNueva = reservaService.reservarCita(2, mascota, veterinario, LocalDate.now().plusDays(1));
-        diagnosticoService.diagnosticar(citaNueva, "Ejemplo de SRP corregido con servicios.");
-        System.err.println(reporteService.generarReporteCita(citaNueva));
+        // 1. Prueba SRP & Servicios
+        Veterinario vet = new Veterinario(1, "Dra. Ana López", "Cirugía");
+        Mascota mascota = new Mascota(1, "Firulais", TipoAnimal.PERRO, 3, "Carlos Perez");
+        baseDatos.getMascotas().add(mascota);
+        baseDatos.getVeterinarios().add(vet);
 
-        Animal pez = new Pez(3, "Nemo");
+        ReservaService reservaService = new ReservaService((BaseDatos) baseDatos);
+        Cita cita = reservaService.reservarCita(101, mascota, vet, LocalDate.now());
+        System.out.println("Cita reservada: " + cita);
+
+        DiagnosticoService diagnosticoService = new DiagnosticoService();
+        diagnosticoService.diagnosticar(cita, "Chequeo general en orden.");
+
+        FacturacionService facturacionService = new FacturacionService((BaseDatos) baseDatos);
+        Factura factura = facturacionService.generarFactura(501, cita, 45.0);
+        factura.setPagada(true);
+        System.out.println("Factura emitida: " + factura);
+
+        // 2. Prueba OCP (Polimorfismo en Tratamientos)
+        ITratamiento vacuna = new VacunaTratamiento(20.0);
+        ITratamiento cirugia = new CirugiaTratamiento(100.0);
+        TratamientoService tratamientoService = new TratamientoService();
+
+        System.out.println("Costo Vacuna: $" + tratamientoService.calcularCosto(vacuna));
+        System.out.println("Indicaciones Cirugía: " + tratamientoService.obtenerIndicaciones(cirugia));
+
+        // 3. Prueba LSP (Capacidades de Animales)
+        Perro perro = new Perro(2, "Rex");
+        Pez pez = new Pez(3, "Nemo");
+
+        perro.caminar();
+        perro.nadar();
         pez.nadar();
-        System.out.println("El pez heredó caminar() y volar(), aunque no debe usarlos.");
-        System.out.println("Tratamiento OCP violado pero funcional: " + tratamiento.obtenerIndicaciones());
+
+        // 4. Prueba DIP & ISP
+        IVeterinarioService directoVet = new DirectoVeterinario();
+        Clinica clinica = new Clinica(directoVet, baseDatos);
+        Cita citaRapida = clinica.agendarConsultaRapida(mascota, vet);
+        System.out.println("Consulta rápida agendada: " + citaRapida);
+
+        ReporteService reporteService = new ReporteService(baseDatos);
+        System.out.println("Ingresos del mes: $" + reporteService.calcularIngresosMensual());
     }
 }
