@@ -9,13 +9,10 @@ import clinicaveterinaria.model.Veterinario;
 import java.util.List;
 
 public interface IBaseDatos {
+    void conectar();
     List<Mascota> getMascotas();
-
     List<Veterinario> getVeterinarios();
-
     List<Cita> getCitas();
-
     List<Tratamiento> getTratamientos();
-
     List<Factura> getFacturas();
 }
